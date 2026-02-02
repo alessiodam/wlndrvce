@@ -2,3 +2,5 @@ obj
 bin
 .idea
 .venv
+*.8xv
+*.8xg
