@@ -1,12 +1,16 @@
 NAME = WLAN
-DESCRIPTION = "WLAN on the CE."
+DESCRIPTION = "WLAN Configuration Utility"
 ARCHIVE = YES
 COMPRESSED = YES
-COMPRESSED_MODE = zx7
+COMPRESSED_MODE = zx0
 
-CFLAGS = -Wall -Wextra -Oz
-CXXFLAGS = -Wall -Wextra -Oz
+GIT_SHA = $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 
-# ----------------------------
+CFLAGS = -Wall -Wextra -Oz -DGIT_SHA=\"$(GIT_SHA)\"
+
+transfer:
+	tilp -n bin/$(NAME).8xp
+
+cat: clean all transfer
 
 include $(shell cedev-config --makefile)
