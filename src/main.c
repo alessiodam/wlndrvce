@@ -12,6 +12,9 @@
 #include <keypadc.h>
 #include <fileioc.h>
 
+#ifndef GIT_TAG
+#define GIT_TAG "v0.0.0"
+#endif
 #ifndef GIT_SHA
 #define GIT_SHA "dev"
 #endif
@@ -230,7 +233,7 @@ static int get_next_opt_idx(ui_tab_t tab, int current, int dir) {
 
 void drawTopBar() {
     char topbar[128];
-    snprintf(topbar, sizeof(topbar), "WLAN Config %s", GIT_SHA);
+    snprintf(topbar, sizeof(topbar), "WLAN Config %s-%s", GIT_TAG, GIT_SHA);
     gfx_SetColor(COLOR_ACCENT);
     gfx_FillRectangle(0, 0, LCD_WIDTH, TOP_BAR_HEIGHT);
     gfx_SetTextFGColor(COLOR_FG);
