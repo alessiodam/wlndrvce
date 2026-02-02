@@ -44,7 +44,7 @@ jobs:
       - name: Run make to build
         run: |
           set -euo pipefail
-          make
+          make all
 
       - name: Verify bin/WLAN.8xp exists
         run: |

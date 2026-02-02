@@ -57,7 +57,7 @@ jobs:
       - name: Build (make)
         run: |
           set -euo pipefail
-          make
+          make all
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
