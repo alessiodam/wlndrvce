@@ -1,0 +1,63 @@
+name: CodeQL
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 1' // Weekly on Mondays
+
+jobs:
+  analyze:
+    name: Analyze (CodeQL)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'cpp' ]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+
+      - name: Install prerequisites
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y && sudo apt-get install -y --no-install-recommends build-essential
+
+      - name: Get CE Toolchain version
+        id: get-version
+        run: |
+          set -euo pipefail
+          echo "version=$(curl -s https://api.github.com/repos/CE-Programming/toolchain/releases/latest | jq -r .tag_name)" >> $GITHUB_OUTPUT
+
+      - name: Cache CE Toolchain
+        uses: actions/cache@v4
+        with:
+          path: CEdev
+          key: cedev-${{ steps.get-version.outputs.version }}
+
+      - name: Setup CE Toolchain
+        run: |
+          set -euo pipefail
+          if [ ! -d CEdev/bin ]; then
+            curl -L --fail "https://github.com/CE-Programming/toolchain/releases/latest/download/CEdev-Linux.tar.gz" -o CEdev-Linux.tar.gz
+            mkdir -p CEdev
+            tar -xzf CEdev-Linux.tar.gz --strip-components=1 -C CEdev
+          fi
+          echo "$PWD/CEdev/bin" >> $GITHUB_PATH
+
+      - name: Build (make)
+        run: |
+          set -euo pipefail
+          make
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
