@@ -8,7 +8,7 @@
 #include "driver.h"
 #include <usbdrvce.h>
 
-void wlndrvce_load_firmware_chunks_for_id(const char id_letters[4]) {
+wlan_result_t wlndrvce_load_firmware_chunks_for_id(const char id_letters[4]) {
   char name[9];
   int loaded = 0;
 
@@ -22,7 +22,7 @@ void wlndrvce_load_firmware_chunks_for_id(const char id_letters[4]) {
     ti_var_t h = ti_Open(name, "r");
     if (!h) {
       if (loaded == 0) {
-        wlndrvce_show_status("Firmware not found", name);
+        return WLAN_ERROR_FIRMWARE_NOT_FOUND;
       }
       break;
     }
@@ -31,8 +31,7 @@ void wlndrvce_load_firmware_chunks_for_id(const char id_letters[4]) {
     uint8_t *buf = malloc(BLK);
     if (!buf) {
       ti_Close(h);
-      wlndrvce_show_status("Firmware load error", "Out of memory");
-      break;
+      return WLAN_ERROR_OUT_OF_MEMORY;
     }
 
     size_t total = 0;
@@ -50,9 +49,7 @@ void wlndrvce_load_firmware_chunks_for_id(const char id_letters[4]) {
     free(buf);
     loaded++;
   }
-  if (loaded > 0) {
-    wlndrvce_show_status("Firmware chunks streamed", "All available processed");
-  }
+  return loaded > 0 ? WLAN_SUCCESS : WLAN_ERROR_FIRMWARE_NOT_FOUND;
 }
 
 usb_error_t wlndrvce_send_firmware_block(usb_device_t device,

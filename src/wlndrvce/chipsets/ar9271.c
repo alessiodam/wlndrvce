@@ -42,16 +42,13 @@ static usb_error_t ar9271_read_reg(wlan_driver_t *dev, uint32_t addr,
   return usb_DefaultControlTransfer(dev->device, &setup, val, 1000, NULL);
 }
 
-int ar9271_init(wlan_driver_t *dev) {
+wlan_result_t ar9271_init(wlan_driver_t *dev) {
   usb_error_t err;
   uint32_t mac_low, mac_high;
-  char msg[64];
 
   if (!dev) {
-    return -1;
+    return WLAN_ERROR_NO_DEVICE;
   }
-
-  wlndrvce_show_status("AR9271", "Initializing...");
 
   wlan_stream_firmware_chunks("AAA"); // from firmwares/manifest.json
 
@@ -67,16 +64,9 @@ int ar9271_init(wlan_driver_t *dev) {
     dev->mac[3] = (uint8_t)(mac_low >> 24);
     dev->mac[4] = (uint8_t)(mac_high >> 0);
     dev->mac[5] = (uint8_t)(mac_high >> 8);
-
-    sprintf(msg, "MAC: %02X:%02X:%02X:%02X:%02X:%02X", dev->mac[0], dev->mac[1],
-            dev->mac[2], dev->mac[3], dev->mac[4], dev->mac[5]);
-    wlndrvce_show_status("AR9271", msg);
-  } else {
-    wlndrvce_show_status("AR9271", "Read MAC Fail");
   }
 
-  wlndrvce_show_status("AR9271", "Initialized");
-  return 0;
+  return WLAN_SUCCESS;
 }
 
 void ar9271_deinit(wlan_driver_t *dev) {
@@ -84,5 +74,4 @@ void ar9271_deinit(wlan_driver_t *dev) {
     return;
 
   ar9271_write_reg(dev, AR9271_REG_RESET, 1);
-  wlndrvce_show_status("AR9271", "Deinitialized");
 }

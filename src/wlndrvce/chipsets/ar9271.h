@@ -10,9 +10,9 @@
  * configuring basic parameters.
  *
  * @param dev Pointer to the WLAN driver structure.
- * @return 0 on success, negative error code on failure.
+ * @return WLAN_SUCCESS on success, error code on failure.
  */
-int ar9271_init(wlan_driver_t *dev);
+wlan_result_t ar9271_init(wlan_driver_t *dev);
 
 /**
  * @brief Deinitialize the Atheros AR9271 chipset.

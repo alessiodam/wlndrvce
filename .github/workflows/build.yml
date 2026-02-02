@@ -109,6 +109,12 @@ jobs:
     needs: [build, pack-firmwares]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
+      - name: Install prerequisites
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends jq curl
+
       - name: Download Build Artifact
         uses: actions/download-artifact@v4
         with:
@@ -120,6 +126,50 @@ jobs:
         with:
           name: firmware-appvars
           path: ./dist
+
+      - name: Get CE Toolchain version
+        id: get-version
+        run: |
+          set -euo pipefail
+          echo "version=$(curl -s https://api.github.com/repos/CE-Programming/toolchain/releases/latest | jq -r .tag_name)" >> $GITHUB_OUTPUT
+
+      - name: Cache CE Toolchain
+        uses: actions/cache@v4
+        with:
+          path: CEdev
+          key: cedev-${{ steps.get-version.outputs.version }}
+
+      - name: Setup CE Toolchain
+        run: |
+          set -euo pipefail
+          if [ ! -d CEdev/bin ]; then
+            curl -L --fail "https://github.com/CE-Programming/toolchain/releases/latest/download/CEdev-Linux.tar.gz" -o CEdev-Linux.tar.gz
+            mkdir -p CEdev
+            tar -xzf CEdev-Linux.tar.gz --strip-components=1 -C CEdev
+          fi
+          echo "$PWD/CEdev/bin" >> $GITHUB_PATH
+
+      - name: Generate Firmware Bundles
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          appvars=(dist/WLFW*.8xv)
+          if [ "${#appvars[@]}" -eq 0 ]; then
+            exit 0
+          fi
+          convbin -i "${appvars[@]}" -o WLANFWS.8xg -k 8xg -n WLANFWS
+          declare -A grouped=()
+          for f in "${appvars[@]}"; do
+            base="$(basename "$f")"
+            name="${base%.8xv}"
+            key="${name:0:7}"
+            grouped["$key"]+="$f"$'\n'
+          done
+          for key in "${!grouped[@]}"; do
+            readarray -t files <<< "${grouped[$key]}"
+            out="${key}.8xg"
+            convbin -i "${files[@]}" -o "$out" -k 8xg -n "$key"
+          done
 
       - name: Determine if Pre-release
         id: check-pre
@@ -137,6 +187,8 @@ jobs:
           files: |
             dist/WLAN.8xp
             dist/WLFW*.8xv
+            dist/WLFW*.8xg
+            dist/WLANFWS.8xg
             dist/manifest.json
           prerelease: ${{ steps.check-pre.outputs.prerelease == 'true' }}
           generate_release_notes: true

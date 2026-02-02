@@ -1,5 +1,6 @@
 #pragma once
 
+#include "wlan.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -12,8 +13,7 @@ typedef struct {
   const char *model_name;
 } wlndrvce_rtl_driver_t;
 
-void wlndrvce_show_status(const char *line1, const char *line2);
-void wlndrvce_load_firmware_chunks_for_id(const char id_letters[4]);
+wlan_result_t wlndrvce_load_firmware_chunks_for_id(const char id_letters[4]);
 
 usb_error_t wlndrvce_enabled_handler(usb_device_t device);
 usb_error_t wlndrvce_event_handler(usb_event_t event, void *data,
