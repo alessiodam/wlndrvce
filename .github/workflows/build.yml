@@ -17,7 +17,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update -y
-          sudo apt-get install -y --no-install-recommends curl tar build-essential ca-certificates
+          sudo apt-get install -y --no-install-recommends build-essential
 
       - name: Setup CE Toolchain
         run: |
