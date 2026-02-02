@@ -19,12 +19,26 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y --no-install-recommends build-essential
 
+      - name: Get CE Toolchain version
+        id: get-version
+        run: |
+          set -euo pipefail
+          echo "version=$(curl -s https://api.github.com/repos/CE-Programming/toolchain/releases/latest | jq -r .tag_name)" >> $GITHUB_OUTPUT
+
+      - name: Cache CE Toolchain
+        uses: actions/cache@v4
+        with:
+          path: CEdev
+          key: cedev-${{ steps.get-version.outputs.version }}
+
       - name: Setup CE Toolchain
         run: |
           set -euo pipefail
-          curl -L --fail "https://github.com/CE-Programming/toolchain/releases/latest/download/CEdev-Linux.tar.gz" -o CEdev-Linux.tar.gz
-          mkdir -p CEdev
-          tar -xzf CEdev-Linux.tar.gz --strip-components=1 -C CEdev
+          if [ ! -d CEdev/bin ]; then
+            curl -L --fail "https://github.com/CE-Programming/toolchain/releases/latest/download/CEdev-Linux.tar.gz" -o CEdev-Linux.tar.gz
+            mkdir -p CEdev
+            tar -xzf CEdev-Linux.tar.gz --strip-components=1 -C CEdev
+          fi
           echo "$PWD/CEdev/bin" >> $GITHUB_PATH
 
       - name: Run make to build
