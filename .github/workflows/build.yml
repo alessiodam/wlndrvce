@@ -1,0 +1,49 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (make)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install prerequisites
+        run: |
+          set -euo pipefail
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends curl tar build-essential ca-certificates
+
+      - name: Setup CE Toolchain
+        run: |
+          set -euo pipefail
+          curl -L --fail "https://github.com/CE-Programming/toolchain/releases/latest/download/CEdev-Linux.tar.gz" -o CEdev-Linux.tar.gz
+          mkdir -p CEdev
+          tar -xzf CEdev-Linux.tar.gz --strip-components=1 -C CEdev
+          echo "$PWD/CEdev/bin" >> $GITHUB_PATH
+
+      - name: Run make to build
+        run: |
+          set -euo pipefail
+          make
+
+      - name: Verify bin/WLAN.8xp exists
+        run: |
+          set -euo pipefail
+          if [ ! -f bin/WLAN.8xp ]; then
+            echo "ERROR: bin/WLAN.8xp not found"
+            ls -la bin || true
+            exit 1
+          fi
+          echo "bin/WLAN.8xp size: $(stat -c%s bin/WLAN.8xp) bytes"
+
+      - name: Upload WLAN.8xp artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: WLAN.8xp
+          path: bin/WLAN.8xp
