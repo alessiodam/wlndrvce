@@ -61,3 +61,46 @@ jobs:
         with:
           name: WLAN.8xp
           path: bin/WLAN.8xp
+
+  pack-firmwares:
+    name: Pack the firmwares
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.14
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.14"
+
+      - name: Upgrade pip and install tivars
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install --upgrade tivars
+
+      - name: Run make_appvars for each firmware
+        run: |
+          set -euo pipefail
+          if [ ! -d firmwares/bins ]; then
+            exit 0
+          fi
+          ls -la firmwares/bins || true
+          for f in firmwares/bins/*; do
+            [ -f "$f" ] || continue
+            fname=$(basename "$f")
+            fwname="${fname%%.*}"
+            echo "Processing firmware file: $fname -> firmware name: $fwname"
+            python tools/make_appvars.py --firmware-name "$fwname"
+          done
+
+      - name: Upload firmware appvars
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-appvars
+          path: |
+            firmwares/WLFW*.8xv
+            firmwares/manifest.json
