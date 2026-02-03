@@ -49,28 +49,40 @@ void wlan_attach_supported_device(usb_device_t device, const char *model_name,
   wlan_driver.chipset = chipset;
 }
 
-wlan_result_t wlan_initialize_chipset(void)
+wlan_result_t wlan_initialize_chipset(wlan_progress_cb_t cb)
 {
   switch (wlan_driver.chipset)
   {
   case CHIPSET_AR9271:
-    return ar9271_init(&wlan_driver);
+    return ar9271_init(&wlan_driver, cb);
   default:
     return WLAN_ERROR_UNKNOWN;
   }
 }
 
-wlan_result_t wlan_stream_firmware_chunks(const char id_letters[4])
+void wlan_debug_dump_state(wlan_log_cb_t log_cb)
 {
-  return wlndrvce_load_firmware_chunks_for_id(id_letters);
+    if (wlan_driver.chipset == CHIPSET_AR9271)
+    {
+        ar9271_debug_dump(&wlan_driver, log_cb);
+    }
+    else
+    {
+        if(log_cb) log_cb("No unknown chipset");
+    }
+}
+
+wlan_result_t wlan_stream_firmware_chunks(usb_device_t device, const char id_letters[4], wlan_progress_cb_t cb)
+{
+  return wlndrvce_load_firmware_chunks_for_id(device, id_letters, cb);
 }
 
 wlan_result_t wlan_send_firmware_block(usb_device_t device, const uint8_t *data,
-                                       size_t len)
+                                       size_t len, uint32_t offset)
 {
   /* TODO: send firmware package to adapter
    *  Implement transfer logic over USB in wlndrvce_send_firmware_block (no UI).*/
-  if (wlndrvce_send_firmware_block(device, data, len) == USB_SUCCESS)
+  if (wlndrvce_send_firmware_block(device, data, len, offset) == USB_SUCCESS)
   {
     return WLAN_SUCCESS;
   }

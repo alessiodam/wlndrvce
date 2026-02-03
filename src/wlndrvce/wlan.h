@@ -38,6 +38,9 @@ typedef struct
 
 extern wlan_driver_t wlan_driver;
 
+typedef void (*wlan_progress_cb_t)(const char *step_name, size_t processed, size_t total);
+typedef void (*wlan_log_cb_t)(const char *msg);
+
 wlan_result_t wlan_init(void);
 
 void wlan_service(void);
@@ -48,10 +51,11 @@ void wlan_handle_device_disconnected(usb_device_t device);
 
 void wlan_attach_supported_device(usb_device_t device, const char *model_name,
                                   wlan_chipset_t chipset);
-wlan_result_t wlan_initialize_chipset(void);
+wlan_result_t wlan_initialize_chipset(wlan_progress_cb_t cb);
+void wlan_debug_dump_state(wlan_log_cb_t log_cb);
 
-wlan_result_t wlan_stream_firmware_chunks(const char id_letters[4]);
+wlan_result_t wlan_stream_firmware_chunks(usb_device_t device, const char id_letters[4], wlan_progress_cb_t cb);
 
 wlan_result_t wlan_send_firmware_block(usb_device_t device, const uint8_t *data,
-                                       size_t len)
+                                       size_t len, uint32_t offset)
     __attribute__((warn_unused_result));

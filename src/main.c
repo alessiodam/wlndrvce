@@ -74,6 +74,17 @@ static void log_append(const char *fmt, ...)
     }
 }
 
+static void log_update_last(const char *fmt, ...)
+{
+    if (log_line_count == 0) return;
+    char buf[64];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    strncpy(log_lines[log_line_count - 1], buf, 64);
+}
+
 static void draw_log_overlay(void)
 {
     gfx_SetColor(COLOR_BG);
@@ -245,12 +256,14 @@ typedef enum
     OPT_MAC_ADDR,
 
     OPT_TEST_INIT,
+    OPT_DEBUG_DUMP,
 
     OPT_COUNT_TOTAL
 } config_id_t;
 
 struct config_option;
 typedef bool (*action_handler_fn)(struct config_option *opt);
+
 
 struct config_option
 {
@@ -363,6 +376,17 @@ static bool action_manage_slot(struct config_option *opt)
     return true;
 }
 
+static void fw_progress_cb(const char *step, size_t sent, size_t total)
+{
+    int pct = total > 0 ? (int)((sent * 100) / total) : 0;
+    if (total == 0 && pct == 0) {
+        log_update_last("%s...", step);
+    } else {
+        log_update_last("%s: %d%%", step, pct);
+    }
+    draw_log_overlay();
+}
+
 static bool action_test_driver(struct config_option *opt)
 {
     (void)opt;
@@ -411,9 +435,12 @@ static bool action_test_driver(struct config_option *opt)
             }
             log_append("Initializing Chipset...");
             draw_log_overlay();
-            res = wlan_initialize_chipset();
+            log_append("Firmware: 0%");
+            draw_log_overlay();
+            res = wlan_initialize_chipset(fw_progress_cb);
             if (res == WLAN_SUCCESS)
             {
+                log_update_last("Firmware: OK");
                 log_append("Chipset Init Success");
                 sprintf(buf, "MAC: %02X:%02X:%02X:%02X:%02X:%02X",
                         wlan_driver.mac[0], wlan_driver.mac[1], wlan_driver.mac[2],
@@ -422,6 +449,7 @@ static bool action_test_driver(struct config_option *opt)
             }
             else
             {
+                log_update_last("Firmware: Failed");
                 log_append("Chipset Init Failed: %d", res);
             }
             draw_log_overlay();
@@ -559,7 +587,7 @@ void drawTabs(ui_tab_t active_tab)
 
     for (int i = 0; i < TAB_COUNT; i++)
     {
-        if (i == active_tab)
+        if ((ui_tab_t)i == active_tab)
             gfx_SetColor(COLOR_ACCENT);
         else
             gfx_SetColor(COLOR_BG);
@@ -669,7 +697,7 @@ void drawOptionRow(int index, bool is_selected, bool is_editing)
         if (str_width > max_width)
         {
             int len = strlen(val_buf);
-            while (len > 3 && gfx_GetStringWidth(val_buf) > max_width - 10)
+            while (len > 3 && (int)gfx_GetStringWidth(val_buf) > max_width - 10)
                 val_buf[--len] = 0;
             if (len < 31)
                 strcat(val_buf, "..");
