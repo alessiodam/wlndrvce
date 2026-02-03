@@ -7,10 +7,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <tice.h>
 #include <graphx.h>
 #include <keypadc.h>
 #include <fileioc.h>
+#include <usbdrvce.h>
+#include "wlndrvce/wlan.h"
 
 #ifndef GIT_TAG
 #define GIT_TAG "v0.0.0"
@@ -40,10 +43,154 @@
 #define CONFIG_APPVAR_NAME "WLANCFG"
 #define CONFIG_MAGIC_BITES 0x574C414E // get it?
 
+#define LOG_X 10
+#define LOG_Y 30
+#define LOG_MAX_LINES 14
+#define LOG_LINE_HEIGHT 12
+
+static char log_lines[LOG_MAX_LINES][64];
+static int log_line_count = 0;
+
+static void log_clear(void) {
+    log_line_count = 0;
+    memset(log_lines, 0, sizeof(log_lines));
+}
+
+static void log_append(const char *fmt, ...) {
+    char buf[64];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    if(log_line_count < LOG_MAX_LINES) strncpy(log_lines[log_line_count++], buf, 64);
+    else {
+        for(int i=1; i<LOG_MAX_LINES; i++) strncpy(log_lines[i-1], log_lines[i], 64);
+        strncpy(log_lines[LOG_MAX_LINES-1], buf, 64);
+    }
+}
+
+static void draw_log_overlay(void) {
+    gfx_SetColor(COLOR_BG);
+    gfx_FillRectangle(0, 0, LCD_WIDTH, LCD_HEIGHT);
+    gfx_SetColor(COLOR_ACCENT);
+    gfx_FillRectangle(0, 0, LCD_WIDTH, TOP_BAR_HEIGHT);
+    gfx_SetTextFGColor(COLOR_FG);
+    gfx_SetTextXY(5, 6);
+    gfx_PrintString("Driver Test Log - Press [Clear] to stop");
+    gfx_SetTextXY(LOG_X, LOG_Y);
+    for(int i=0; i<log_line_count; i++) {
+        gfx_SetTextXY(LOG_X, LOG_Y + i*LOG_LINE_HEIGHT);
+        gfx_PrintString(log_lines[i]);
+    }
+    gfx_SwapDraw();
+}
+
+typedef struct {
+  usb_control_setup_t setup;
+  usb_device_descriptor_t device_descriptor;
+} probe_item_t;
+
+extern wlan_driver_t wlan_driver;
+
+static usb_error_t probe_descriptor_handler(usb_endpoint_t endpoint,
+                                            usb_transfer_status_t status,
+                                            size_t transferred,
+                                            usb_transfer_data_t *data) {
+  (void)data;
+  usb_device_t device = usb_GetEndpointDevice(endpoint);
+  probe_item_t *item = usb_GetDeviceData(device);
+
+  if (item == NULL) return USB_SUCCESS;
+
+  if (status != USB_TRANSFER_COMPLETED ||
+      transferred != sizeof(usb_device_descriptor_t) ||
+      item->device_descriptor.bLength < transferred ||
+      item->device_descriptor.bDescriptorType != USB_DEVICE_DESCRIPTOR) {
+    usb_SetDeviceData(device, NULL);
+    free(item);
+    return USB_SUCCESS;
+  }
+
+  if (item->device_descriptor.idVendor == 0x0CF3 &&
+      item->device_descriptor.idProduct == 0x9271) {
+    wlan_attach_supported_device(device, "Atheros AR9271", CHIPSET_AR9271);
+  }
+
+  usb_SetDeviceData(device, NULL);
+  free(item);
+  return USB_SUCCESS;
+}
+
+static usb_error_t wlan_usb_enabled_handler(usb_device_t device) {
+  probe_item_t *item = usb_GetDeviceData(device);
+  if (item == NULL) return USB_SUCCESS;
+
+  item->setup.bmRequestType = USB_DEVICE_TO_HOST | USB_STANDARD_REQUEST | USB_RECIPIENT_DEVICE;
+  item->setup.bRequest = USB_GET_DESCRIPTOR_REQUEST;
+  item->setup.wValue = USB_DEVICE_DESCRIPTOR << 8;
+  item->setup.wIndex = 0;
+  item->setup.wLength = sizeof(usb_device_descriptor_t);
+
+  return usb_ScheduleDefaultControlTransfer(device, &item->setup,
+                                            &item->device_descriptor,
+                                            &probe_descriptor_handler, NULL);
+}
+
+static usb_error_t wlan_usb_event_handler(usb_event_t event, void *data, void *user_data) {
+  (void)user_data;
+  usb_device_t device = data;
+  probe_item_t *item;
+
+  switch (event) {
+  case USB_DEVICE_CONNECTED_EVENT:
+    wlan_handle_device_connected(device);
+    item = malloc(sizeof(*item));
+    if (item == NULL) return USB_SUCCESS;
+    item->device_descriptor.bLength = 0;
+    usb_SetDeviceData(device, item);
+    if (!(usb_GetRole() & USB_ROLE_DEVICE)) usb_ResetDevice(device);
+    break;
+
+  case USB_DEVICE_ENABLED_EVENT:
+    wlan_handle_device_enabled(device);
+    wlan_usb_enabled_handler(device);
+    break;
+
+  case USB_DEVICE_DISCONNECTED_EVENT:
+    wlan_handle_device_disconnected(device);
+    item = usb_GetDeviceData(device);
+    if (item != NULL) {
+      usb_SetDeviceData(device, NULL);
+      free(item);
+    }
+    break;
+  default: break;
+  }
+  return USB_SUCCESS;
+}
+
+static usb_error_t event_handler(usb_event_t event, void *data, void *user_data) {
+  switch (event) {
+  case USB_DEVICE_CONNECTED_EVENT:
+    log_append("Device connected");
+    break;
+  case USB_DEVICE_ENABLED_EVENT:
+    log_append("Device enabled");
+    break;
+  case USB_DEVICE_DISCONNECTED_EVENT:
+    log_append("Device removed");
+    break;
+  default: break;
+  }
+  draw_log_overlay();
+  return wlan_usb_event_handler(event, data, user_data);
+}
+
 typedef enum {
     TAB_NETWORKS = 0,
     TAB_MISC,
     TAB_EXPERT,
+    TAB_TESTING,
     TAB_COUNT
 } ui_tab_t;
 
@@ -70,6 +217,8 @@ typedef enum {
     OPT_CHANNEL,
     OPT_DEBUG_LOG,
     OPT_MAC_ADDR,
+
+    OPT_TEST_INIT,
 
     OPT_COUNT_TOTAL
 } config_id_t;
@@ -171,6 +320,70 @@ static bool action_manage_slot(struct config_option *opt) {
     return true;
 }
 
+static bool action_test_driver(struct config_option *opt) {
+    (void)opt;
+    bool was_attached = false;
+    wlan_result_t res;
+    char buf[64];
+
+    log_clear();
+    log_append("Initializing WLAN stack...");
+    draw_log_overlay();
+
+    wlan_init();
+
+    if (usb_Init(event_handler, NULL, NULL, USB_DEFAULT_INIT_FLAGS)) {
+        log_append("USB Init Failed!");
+        draw_log_overlay();
+        while (os_GetCSC() != sk_Clear);
+        return true;
+    }
+
+    log_append("Waiting for hardware...");
+    draw_log_overlay();
+
+    while (1) {
+        kb_Scan();
+        if (kb_Data[6] & kb_Clear) break;
+
+        if (usb_HandleEvents() != USB_SUCCESS) {
+            log_append("USB Error");
+            draw_log_overlay();
+            break;
+        }
+        wlan_service();
+
+        if (wlan_driver.attached && !was_attached) {
+            log_append("Driver Attached");
+            if (wlan_driver.model_name) {
+                log_append(wlan_driver.model_name);
+            }
+            log_append("Initializing Chipset...");
+            draw_log_overlay();
+            res = wlan_initialize_chipset();
+            if (res == WLAN_SUCCESS) {
+                log_append("Chipset Init Success");
+                sprintf(buf, "MAC: %02X:%02X:%02X:%02X:%02X:%02X",
+                        wlan_driver.mac[0], wlan_driver.mac[1], wlan_driver.mac[2],
+                        wlan_driver.mac[3], wlan_driver.mac[4], wlan_driver.mac[5]);
+                log_append(buf);
+            } else {
+                log_append("Chipset Init Failed: %d", res);
+            }
+            draw_log_overlay();
+            was_attached = true;
+        } else if (!wlan_driver.attached && was_attached) {
+            was_attached = false;
+            log_append("Driver Detached");
+            draw_log_overlay();
+        }
+    }
+
+    usb_Cleanup();
+    while (os_GetCSC() == sk_Clear);
+    return true;
+}
+
 // hmmm very clean formatting. I like it.
 // I have an exam tomorrow now that I think about it :p
 static struct config_option options[] = {
@@ -185,6 +398,7 @@ static struct config_option options[] = {
     {"Channel",       TAB_EXPERT,   OPT_CHANNEL,      TYPE_INT_SLIDER, 6, 1, 14, NULL},
     {"Debug Logging", TAB_EXPERT,   OPT_DEBUG_LOG,    TYPE_BOOL_TOGGLE, 0, 0, 1, NULL},
     {"MAC Address",   TAB_EXPERT,   OPT_MAC_ADDR,     TYPE_INFO,       0, 0, 0, NULL},
+    {"Init Driver",   TAB_TESTING,  OPT_TEST_INIT,    TYPE_ACTION,     0, 0, 0, action_test_driver},
 };
 
 #define OPTION_COUNT (sizeof(options) / sizeof(options[0]))
@@ -242,7 +456,7 @@ void drawTopBar() {
 }
 
 void drawTabs(ui_tab_t active_tab) {
-    const char *names[] = {"Networks", "Misc", "Smart Guy"}; // Smart Guy = Expert because me when me when when me when me
+    const char *names[] = {"Networks", "Misc", "Smart Guy", "Testing"}; // Smart Guy = Expert because me when me when when me when me
     int y = CONTENT_Y;
 
     for(int i=0; i<TAB_COUNT; i++) {
@@ -283,6 +497,9 @@ void drawOptionRow(int index, bool is_selected, bool is_editing) {
         case TYPE_INT_SLIDER:
             snprintf(val_buf, sizeof(val_buf), "< %d >", (int)opt->value);
             break;
+        case TYPE_ACTION:
+             snprintf(val_buf, sizeof(val_buf), "[ RUN ]");
+             break;
         case TYPE_NET_SLOT: {
             int idx = opt->id - OPT_NET_SLOT_1;
             if (!g_cfg.slots[idx].used) {
