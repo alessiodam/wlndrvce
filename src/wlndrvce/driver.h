@@ -7,7 +7,8 @@
 #include <tice.h>
 #include <usbdrvce.h>
 
-typedef struct {
+typedef struct
+{
   usb_device_t device;
   bool attached;
   const char *model_name;

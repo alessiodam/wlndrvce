@@ -7,8 +7,8 @@
 
 wlan_driver_t wlan_driver = {0};
 
-
-wlan_result_t wlan_init(void) {
+wlan_result_t wlan_init(void)
+{
   wlan_driver.device = NULL;
   wlan_driver.attached = false;
   wlan_driver.model_name = NULL;
@@ -16,7 +16,8 @@ wlan_result_t wlan_init(void) {
   return WLAN_SUCCESS;
 }
 
-void wlan_service(void) {
+void wlan_service(void)
+{
   // periodic WLAN tasks here if needed
 }
 
@@ -24,10 +25,13 @@ void wlan_handle_device_connected(usb_device_t device) { (void)device; }
 
 void wlan_handle_device_enabled(usb_device_t device) { (void)device; }
 
-void wlan_handle_device_disconnected(usb_device_t device) {
+void wlan_handle_device_disconnected(usb_device_t device)
+{
   (void)device;
-  if (wlan_driver.attached && wlan_driver.device == device) {
-    if (wlan_driver.chipset == CHIPSET_AR9271) {
+  if (wlan_driver.attached && wlan_driver.device == device)
+  {
+    if (wlan_driver.chipset == CHIPSET_AR9271)
+    {
       ar9271_deinit(&wlan_driver);
     }
     wlan_driver.attached = false;
@@ -37,15 +41,18 @@ void wlan_handle_device_disconnected(usb_device_t device) {
 }
 
 void wlan_attach_supported_device(usb_device_t device, const char *model_name,
-                                  wlan_chipset_t chipset) {
+                                  wlan_chipset_t chipset)
+{
   wlan_driver.device = device;
   wlan_driver.attached = true;
   wlan_driver.model_name = model_name ? model_name : "WLAN Adapter";
   wlan_driver.chipset = chipset;
 }
 
-wlan_result_t wlan_initialize_chipset(void) {
-  switch (wlan_driver.chipset) {
+wlan_result_t wlan_initialize_chipset(void)
+{
+  switch (wlan_driver.chipset)
+  {
   case CHIPSET_AR9271:
     return ar9271_init(&wlan_driver);
   default:
@@ -53,15 +60,18 @@ wlan_result_t wlan_initialize_chipset(void) {
   }
 }
 
-wlan_result_t wlan_stream_firmware_chunks(const char id_letters[4]) {
+wlan_result_t wlan_stream_firmware_chunks(const char id_letters[4])
+{
   return wlndrvce_load_firmware_chunks_for_id(id_letters);
 }
 
 wlan_result_t wlan_send_firmware_block(usb_device_t device, const uint8_t *data,
-                                       size_t len) {
+                                       size_t len)
+{
   /* TODO: send firmware package to adapter
    *  Implement transfer logic over USB in wlndrvce_send_firmware_block (no UI).*/
-  if (wlndrvce_send_firmware_block(device, data, len) == USB_SUCCESS) {
+  if (wlndrvce_send_firmware_block(device, data, len) == USB_SUCCESS)
+  {
     return WLAN_SUCCESS;
   }
   return WLAN_ERROR_USB_TRANSFER_FAILED;

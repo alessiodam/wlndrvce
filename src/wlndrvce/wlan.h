@@ -7,7 +7,8 @@
 #include <tice.h>
 #include <usbdrvce.h>
 
-typedef enum {
+typedef enum
+{
   WLAN_SUCCESS = 0,
   WLAN_ERROR_NONE = 0,
   WLAN_ERROR_UNKNOWN,
@@ -20,12 +21,14 @@ typedef enum {
   WLAN_ERROR_USB_TRANSFER_FAILED,
 } wlan_result_t;
 
-typedef enum {
+typedef enum
+{
   CHIPSET_UNKNOWN = 0,
   CHIPSET_AR9271,
 } wlan_chipset_t;
 
-typedef struct {
+typedef struct
+{
   usb_device_t device;
   bool attached;
   const char *model_name;
