@@ -24,7 +24,7 @@ typedef enum
 typedef enum
 {
   CHIPSET_UNKNOWN = 0,
-  CHIPSET_AR9271,
+  CHIPSET_ATH9K_HTC,
 } wlan_chipset_t;
 
 typedef struct

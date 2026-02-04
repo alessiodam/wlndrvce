@@ -136,7 +136,7 @@ static usb_error_t probe_descriptor_handler(usb_endpoint_t endpoint,
     if (item->device_descriptor.idVendor == 0x0CF3 &&
         item->device_descriptor.idProduct == 0x9271)
     {
-        wlan_attach_supported_device(device, "Atheros AR9271", CHIPSET_AR9271);
+        wlan_attach_supported_device(device, "Atheros AR9271", CHIPSET_ATH9K_HTC);
     }
 
     usb_SetDeviceData(device, NULL);

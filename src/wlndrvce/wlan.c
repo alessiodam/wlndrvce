@@ -1,5 +1,5 @@
 #include "wlan.h"
-#include "chipsets/ar9271.h"
+#include "chipsets/ath9k_htc.h"
 #include "driver.h"
 #include <stdio.h>
 #include <tice.h>
@@ -30,9 +30,9 @@ void wlan_handle_device_disconnected(usb_device_t device)
   (void)device;
   if (wlan_driver.attached && wlan_driver.device == device)
   {
-    if (wlan_driver.chipset == CHIPSET_AR9271)
+    if (wlan_driver.chipset == CHIPSET_ATH9K_HTC)
     {
-      ar9271_deinit(&wlan_driver);
+      ath9k_htc_deinit(&wlan_driver);
     }
     wlan_driver.attached = false;
     wlan_driver.device = NULL;
@@ -53,8 +53,8 @@ wlan_result_t wlan_initialize_chipset(wlan_progress_cb_t cb)
 {
   switch (wlan_driver.chipset)
   {
-  case CHIPSET_AR9271:
-    return ar9271_init(&wlan_driver, cb);
+  case CHIPSET_ATH9K_HTC:
+    return ath9k_htc_init(&wlan_driver, cb);
   default:
     return WLAN_ERROR_UNKNOWN;
   }
@@ -62,9 +62,9 @@ wlan_result_t wlan_initialize_chipset(wlan_progress_cb_t cb)
 
 void wlan_debug_dump_state(wlan_log_cb_t log_cb)
 {
-    if (wlan_driver.chipset == CHIPSET_AR9271)
+    if (wlan_driver.chipset == CHIPSET_ATH9K_HTC)
     {
-        ar9271_debug_dump(&wlan_driver, log_cb);
+        ath9k_htc_debug_dump(&wlan_driver, log_cb);
     }
     else
     {
@@ -74,15 +74,15 @@ void wlan_debug_dump_state(wlan_log_cb_t log_cb)
 
 wlan_result_t wlan_stream_firmware_chunks(usb_device_t device, const char id_letters[4], wlan_progress_cb_t cb)
 {
-  return wlndrvce_load_firmware_chunks_for_id(device, id_letters, cb);
+  return wlan_usb_load_firmware_chunks_for_id(device, id_letters, cb);
 }
 
 wlan_result_t wlan_send_firmware_block(usb_device_t device, const uint8_t *data,
                                        size_t len, uint32_t offset)
 {
   /* TODO: send firmware package to adapter
-   *  Implement transfer logic over USB in wlndrvce_send_firmware_block (no UI).*/
-  if (wlndrvce_send_firmware_block(device, data, len, offset) == USB_SUCCESS)
+   *  Implement transfer logic over USB in wlan_usb_send_firmware_block (no UI).*/
+  if (wlan_usb_send_firmware_block(device, data, len, offset) == USB_SUCCESS)
   {
     return WLAN_SUCCESS;
   }
